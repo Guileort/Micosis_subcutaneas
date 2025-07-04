@@ -87,6 +87,13 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Estilo para mensajes de error prominentes */
+        .message.error {
+            background-color: #fee2e2; /* Rojo claro (red-100 de Tailwind) */
+            color: #991b1b; /* Rojo oscuro (red-800 de Tailwind) */
+            font-weight: bold;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -141,8 +148,8 @@
         // ====================================================================================================
         // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> INSTRUCCIONES CRÍTICAS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         // ====================================================================================================
-        // Para que esta aplicación funcione en GitHub Pages, DEBES reemplazar los valores de marcador
-        // de posición (placeholders) en 'firebaseConfig' y 'GEMINI_API_KEY' con tus credenciales REALES.
+        // PARA QUE ESTA APLICACIÓN FUNCIONE EN GITHUB PAGES, DEBES REEMPLAZAR LOS VALORES DE MARCADOR
+        // DE POSICIÓN (PLACEHOLDERS) EN 'firebaseConfig' Y 'GEMINI_API_KEY' CON TUS CREDENCIALES REALES.
         //
         // 1. CONFIGURACIÓN DE FIREBASE (firebaseConfig):
         //    Obtén esta configuración de la Consola de Firebase:
@@ -152,18 +159,16 @@
         //    - Haz clic en el icono de "Web" (</>) si aún no tienes una app web, o haz clic en tu app web existente.
         //    - Copia el objeto 'firebaseConfig' que se muestra.
         //
-        //    REEMPLAZA CADA VALOR "TU_..." CON EL VALOR REAL DE TU PROYECTO:
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-		const firebaseConfig = {
-  			apiKey: "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ,
-  			authDomain: "simulacion-micosis-subcutaneas.firebaseapp.com",
-  			projectId: "simulacion-micosis-subcutaneas",
-  			storageBucket: "simulacion-micosis-subcutaneas.firebasestorage.app",
- 			 messagingSenderId: "652374356018",
- 			 appId: "1:652374356018:web:77c483d9bc2211a5ac8c2b",
- 			 measurementId: "G-LRGJRDCC6T"
-	};
-        //
+        //    ¡¡¡REEMPLAZA CADA VALOR "TU_..." CON EL VALOR REAL DE TU PROYECTO!!!
+        const firebaseConfig = {
+            apiKey: "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ", // <--- ¡COMMA REMOVED HERE! (COMA ELIMINADA AQUÍ)
+            authDomain: "simulacion-micosis-subcutaneas.firebaseapp.com",
+            projectId: "simulacion-micosis-subcutaneas",
+            storageBucket: "simulacion-micosis-subcutaneas.firebasestorage.app",
+            messagingSenderId: "652374356018",
+            appId: "1:652374356018:web:77c483d9bc2211a5ac8c2b",
+            measurementId: "G-LRGJRDCC6T"
+        };
         //
         // 2. CLAVE DE API DE GEMINI (GEMINI_API_KEY):
         //    Obtén tu clave de API de Gemini desde Google AI Studio o la Consola de Google Cloud.
@@ -175,17 +180,12 @@
         //    usar un proxy de backend para ocultar la clave. Para pruebas o demostraciones en GitHub Pages,
         //    puedes insertarla aquí.
         //
-        //    REEMPLAZA "TU_CLAVE_API_DE_GEMINI" CON TU CLAVE REAL:
+        //    ¡¡¡REEMPLAZA "TU_CLAVE_API_DE_GEMINI" CON TU CLAVE REAL!!!
         const GEMINI_API_KEY = "TU_CLAVE_API_DE_GEMINI"; // <--- ¡REEMPLAZA ESTO! Ejemplo: "AIzaSyD_XyZ789..."
         // ====================================================================================================
 
         // Usamos el projectId como appId para la estructura de Firestore
         const appId = firebaseConfig.projectId;
-
-        // initialAuthToken ya no es relevante para despliegues directos en GitHub Pages,
-        // ya que no hay un entorno de Canvas que lo inyecte.
-        // La autenticación anónima se manejará directamente.
-        // const initialAuthToken = null; // Esta línea ya no es necesaria, se eliminó la referencia en initializeFirebase
 
         let app; // Instancia de la aplicación Firebase
         let db;  // Instancia de Firestore
@@ -223,10 +223,14 @@
         // --- Inicialización y Autenticación de Firebase ---
         async function initializeFirebase() {
             // Verificar si la configuración de Firebase es la predeterminada (no real)
-            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID") {
-                console.error("ERROR DE CONFIGURACIÓN DE FIREBASE: Por favor, reemplaza los valores de 'firebaseConfig' en el código con tu configuración real de Firebase. Consulta la Consola de Firebase para obtenerlos.");
-                displayMessage("Error de configuración: La aplicación no puede conectarse a Firebase. Por favor, actualiza la configuración en el código.", true);
+            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI") {
+                const errorMessage = "¡ERROR CRÍTICO DE CONFIGURACIÓN! Por favor, reemplaza los valores de 'firebaseConfig' y 'GEMINI_API_KEY' en el código con tus credenciales reales. Consulta los comentarios en el código para más detalles.";
+                console.error(errorMessage);
+                displayMessage(errorMessage, true, true); // Añadir un tercer parámetro para indicar que es un error crítico
                 showLoading(false);
+                // Deshabilitar el botón de inicio para evitar intentos fallidos
+                startSimulationBtn.disabled = true;
+                startSimulationBtn.textContent = "Error de Configuración";
                 return; // Detener la inicialización si la configuración es incorrecta
             }
 
@@ -249,7 +253,10 @@
                 });
             } catch (error) {
                 console.error("Error initializing Firebase:", error);
-                displayMessage("Error al inicializar la aplicación. Por favor, recarga la página.", true);
+                displayMessage(`Error al inicializar la aplicación: ${error.message}. Por favor, verifica tu configuración de Firebase y recarga la página.`, true, true);
+                showLoading(false);
+                startSimulationBtn.disabled = true;
+                startSimulationBtn.textContent = "Error de Inicialización";
             }
         }
 
@@ -257,6 +264,8 @@
         async function loadOrCreateSimulation() {
             if (!userId) {
                 console.error("User ID is not available for loading simulation.");
+                // Si userId no está disponible, es probable que la inicialización de Firebase fallara.
+                // displayMessage ya debería haber manejado el error.
                 return;
             }
 
@@ -298,7 +307,7 @@
                 }
             }, (error) => {
                 console.error("Error listening to simulation document:", error);
-                displayMessage("Error al cargar la simulación en tiempo real.", true);
+                displayMessage("Error al cargar la simulación en tiempo real.", true, true);
             });
         }
 
@@ -307,38 +316,47 @@
             if (simulationDocRef) {
                 await updateDoc(simulationDocRef, simulationState);
             } else {
-                console.error("Simulation document reference not set.");
+                console.error("Simulation document reference not set. Cannot save state.");
+                displayMessage("Error: No se pudo guardar el estado de la simulación. La referencia al documento no está establecida.", true, true);
             }
         }
 
         // --- Renderizado de la Interfaz de Usuario (UI) ---
-        function renderChatHistory() {
-            chatHistoryDiv.innerHTML = ''; // Limpia el historial actual
-            simulationState.chatHistory.forEach(msg => {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `message ${msg.role}`; // Asigna clases CSS según el rol (ai/user)
-                msgDiv.innerHTML = formatText(msg.text); // Formatea y añade el texto del mensaje
-                chatHistoryDiv.appendChild(msgDiv);
-            });
+        // isError = true para mensajes de error, para aplicar estilos específicos
+        function displayMessage(text, isAI = true, isError = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isAI ? 'ai' : 'user'} ${isError ? 'error' : ''}`;
+            msgDiv.innerHTML = formatText(text);
+            chatHistoryDiv.appendChild(msgDiv);
             chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight; // Desplaza el chat hasta el último mensaje
+
+            // Si es un error, no lo guardamos en el historial persistente del chat
+            if (!isError) {
+                simulationState.chatHistory.push({ role: isAI ? 'ai' : 'user', text: text });
+                updateSimulationStateInFirestore(); // Esto activará el onSnapshot y renderizará el chat
+            }
         }
 
-        // Función para añadir un mensaje al historial y actualizar Firestore
-        function displayMessage(text, isAI = true) {
-            simulationState.chatHistory.push({ role: isAI ? 'ai' : 'user', text: text });
-            updateSimulationStateInFirestore(); // Esto activará el onSnapshot y renderizará el chat
-        }
 
         // Muestra/oculta el indicador de carga
         function showLoading(show) {
             loadingIndicator.classList.toggle('hidden', !show);
             userInput.disabled = show; // Deshabilita el input mientras carga
             sendBtn.disabled = show; // Deshabilita el botón de enviar
-            startSimulationBtn.disabled = show; // Deshabilita el botón de iniciar/reiniciar
+            // Solo deshabilitamos el botón de inicio si hay un error crítico de configuración.
+            // De lo contrario, debe estar disponible para iniciar/reiniciar.
+            if (!startSimulationBtn.disabled) {
+                startSimulationBtn.disabled = show;
+            }
         }
 
         // Actualiza el estado de los controles de UI (botones, input) según la fase de la simulación
         function updateUIForSimulationState() {
+            // Si el botón de inicio está deshabilitado por un error de configuración, no lo habilitamos aquí.
+            if (startSimulationBtn.disabled && startSimulationBtn.textContent === "Error de Configuración") {
+                return;
+            }
+
             if (simulationState.status === 'initial') {
                 startSimulationBtn.classList.remove('hidden');
                 userInput.classList.add('hidden');
@@ -363,8 +381,9 @@
         async function callLLM(promptText) {
             // Verificar si la clave API de Gemini es la predeterminada (no real)
             if (GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI" || !GEMINI_API_KEY) {
-                console.error("ERROR DE CONFIGURACIÓN DE API DE GEMINI: Por favor, reemplaza 'TU_CLAVE_API_DE_GEMINI' en el código con tu clave API real de Gemini.");
-                displayMessage("Error de configuración: La aplicación no puede comunicarse con el experto (API Key de Gemini no válida). Por favor, actualiza la configuración en el código.", true);
+                const errorMessage = "ERROR DE CONFIGURACIÓN DE API DE GEMINI: Por favor, reemplaza 'TU_CLAVE_API_DE_GEMINI' en el código con tu clave API real de Gemini.";
+                console.error(errorMessage);
+                displayMessage(errorMessage, true, true);
                 showLoading(false);
                 return null; // Detener la llamada si la clave es incorrecta
             }
@@ -406,7 +425,7 @@
                 }
             } catch (error) {
                 console.error('Error al llamar al LLM:', error);
-                displayMessage(`Error en la comunicación con el experto: ${error.message}. Intenta de nuevo.`, true);
+                displayMessage(`Error en la comunicación con el experto: ${error.message}. Intenta de nuevo.`, true, true);
                 return null;
             } finally {
                 showLoading(false); // Oculta el spinner de carga
@@ -415,6 +434,13 @@
 
         // --- Lógica de la Simulación ---
         async function startSimulation() {
+            // Antes de iniciar, verificar nuevamente si las claves están configuradas
+            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ") {
+                const errorMessage = "¡ERROR DE CONFIGURACIÓN! No se puede iniciar la simulación. Por favor, actualiza tus claves de Firebase y Gemini en el código.";
+                displayMessage(errorMessage, true, true);
+                return; // Detener la simulación si las claves no están
+            }
+
             // Reinicia el estado de la simulación
             simulationState = {
                 status: 'diagnosing',
@@ -433,7 +459,7 @@
                 ]
             };
             // Inicia la simulación con la primera pregunta diagnóstica
-            simulationState.chatHistory.push({ role: 'ai', text: "¡Excelente! Comencemos con unas preguntas de diagnóstico iniciales para explorar tus conocimientos. Esto nos ayudará a adaptar el caso. \n\n<strong>Pregunta 1: " + simulationState.diagnosticQuestions[0] + "</strong>" });
+            displayMessage("¡Excelente! Comencemos con unas preguntas de diagnóstico iniciales para explorar tus conocimientos. Esto nos ayudará a adaptar el caso. \n\n<strong>Pregunta 1: " + simulationState.diagnosticQuestions[0] + "</strong>", true);
             simulationState.currentQuestionIndex = 0;
             await updateSimulationStateInFirestore(); // Guarda el estado inicial en Firestore
         }
