@@ -135,16 +135,54 @@
     <script type="module">
         // Importaciones de Firebase SDK (versión 11.6.1)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Variables globales de Firebase proporcionadas por el entorno Canvas
-        // Estas variables son inyectadas por el entorno de Canvas o un sistema similar
-        // y son adecuadas para despliegues estáticos como GitHub Pages donde no se
-        // manejan claves de API directamente en el código del cliente por seguridad.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ====================================================================================================
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> INSTRUCCIONES CRÍTICAS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        // ====================================================================================================
+        // Para que esta aplicación funcione en GitHub Pages, DEBES reemplazar los valores de marcador
+        // de posición (placeholders) en 'firebaseConfig' y 'GEMINI_API_KEY' con tus credenciales REALES.
+        //
+        // 1. CONFIGURACIÓN DE FIREBASE (firebaseConfig):
+        //    Obtén esta configuración de la Consola de Firebase:
+        //    - Ve a https://console.firebase.google.com/
+        //    - Selecciona tu proyecto.
+        //    - En la página "Project overview" (Descripción general del proyecto), busca la sección "Your apps" (Tus aplicaciones).
+        //    - Haz clic en el icono de "Web" (</>) si aún no tienes una app web, o haz clic en tu app web existente.
+        //    - Copia el objeto 'firebaseConfig' que se muestra.
+        //
+        //    REEMPLAZA CADA VALOR "TU_..." CON EL VALOR REAL DE TU PROYECTO:
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY", // <--- ¡REEMPLAZA ESTO! Ejemplo: "AIzaSyC_AbC123..."
+            authDomain: "TU_AUTH_DOMAIN", // <--- ¡REEMPLAZA ESTO! Ejemplo: "tu-proyecto-id.firebaseapp.com"
+            projectId: "TU_PROJECT_ID", // <--- ¡REEMPLAZA ESTO! Ejemplo: "tu-proyecto-id"
+            storageBucket: "TU_STORAGE_BUCKET", // <--- ¡REEMPLAZA ESTO! Ejemplo: "tu-proyecto-id.appspot.com"
+            messagingSenderId: "TU_MESSAGING_SENDER_ID", // <--- ¡REEMPLAZA ESTO! Ejemplo: "1234567890"
+            appId: "TU_APP_ID" // <--- ¡REEMPLAZA ESTO! Ejemplo: "1:1234567890:web:abcdef123456"
+        };
+        //
+        // 2. CLAVE DE API DE GEMINI (GEMINI_API_KEY):
+        //    Obtén tu clave de API de Gemini desde Google AI Studio o la Consola de Google Cloud.
+        //    - Ve a https://aistudio.google.com/ o https://console.cloud.google.com/
+        //    - Crea una nueva clave de API para tu proyecto.
+        //
+        //    ADVERTENCIA DE SEGURIDAD: Insertar la clave de API directamente en el código del cliente
+        //    la hace visible públicamente. Para aplicaciones en producción, se recomienda encarecidamente
+        //    usar un proxy de backend para ocultar la clave. Para pruebas o demostraciones en GitHub Pages,
+        //    puedes insertarla aquí.
+        //
+        //    REEMPLAZA "TU_CLAVE_API_DE_GEMINI" CON TU CLAVE REAL:
+        const GEMINI_API_KEY = "TU_CLAVE_API_DE_GEMINI"; // <--- ¡REEMPLAZA ESTO! Ejemplo: "AIzaSyD_XyZ789..."
+        // ====================================================================================================
+
+        // Usamos el projectId como appId para la estructura de Firestore
+        const appId = firebaseConfig.projectId;
+
+        // initialAuthToken ya no es relevante para despliegues directos en GitHub Pages,
+        // ya que no hay un entorno de Canvas que lo inyecte.
+        // La autenticación anónima se manejará directamente.
+        // const initialAuthToken = null; // Esta línea ya no es necesaria, se eliminó la referencia en initializeFirebase
 
         let app; // Instancia de la aplicación Firebase
         let db;  // Instancia de Firestore
@@ -181,11 +219,13 @@
 
         // --- Inicialización y Autenticación de Firebase ---
         async function initializeFirebase() {
-            // No se realiza una verificación de los marcadores de posición aquí,
-            // ya que se asume que las variables globales __firebase_config, etc.,
-            // serán proporcionadas por el entorno de despliegue (como Canvas).
-            // Si despliegas esto directamente en un servidor web sin un entorno
-            // que inyecte estas variables, necesitarás insertar tu firebaseConfig real.
+            // Verificar si la configuración de Firebase es la predeterminada (no real)
+            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID") {
+                console.error("ERROR DE CONFIGURACIÓN DE FIREBASE: Por favor, reemplaza los valores de 'firebaseConfig' en el código con tu configuración real de Firebase. Consulta la Consola de Firebase para obtenerlos.");
+                displayMessage("Error de configuración: La aplicación no puede conectarse a Firebase. Por favor, actualiza la configuración en el código.", true);
+                showLoading(false);
+                return; // Detener la inicialización si la configuración es incorrecta
+            }
 
             try {
                 app = initializeApp(firebaseConfig);
@@ -200,12 +240,8 @@
                         console.log("Firebase Authenticated. User ID:", userId);
                         await loadOrCreateSimulation(); // Carga o crea la simulación para este usuario
                     } else {
-                        // Si no hay usuario autenticado, intenta iniciar sesión anónimamente
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        // En GitHub Pages, si no hay token personalizado, siempre intentamos autenticación anónima.
+                        await signInAnonymously(auth);
                     }
                 });
             } catch (error) {
@@ -322,6 +358,14 @@
 
         // --- Interacción con el Modelo de Lenguaje (LLM) ---
         async function callLLM(promptText) {
+            // Verificar si la clave API de Gemini es la predeterminada (no real)
+            if (GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI" || !GEMINI_API_KEY) {
+                console.error("ERROR DE CONFIGURACIÓN DE API DE GEMINI: Por favor, reemplaza 'TU_CLAVE_API_DE_GEMINI' en el código con tu clave API real de Gemini.");
+                displayMessage("Error de configuración: La aplicación no puede comunicarse con el experto (API Key de Gemini no válida). Por favor, actualiza la configuración en el código.", true);
+                showLoading(false);
+                return null; // Detener la llamada si la clave es incorrecta
+            }
+
             showLoading(true); // Muestra el spinner de carga
             try {
                 // Prepara el historial del chat para el LLM, mapeando 'ai' a 'model'
@@ -334,7 +378,7 @@
                 chatHistoryForLLM.push({ role: "user", parts: [{ text: promptText }] });
 
                 const payload = { contents: chatHistoryForLLM };
-                const apiKey = ""; // La clave API será proporcionada por Canvas en tiempo de ejecución
+                const apiKey = GEMINI_API_KEY; // Usamos la clave API de Gemini definida arriba
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
                 const response = await fetch(apiUrl, {
