@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación de Casos Clínicos de Micología</title>
+    <!-- CDN de Tailwind CSS para estilos modernos y responsivos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos generales del cuerpo de la página */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Gris muy claro, casi blanco */
+            color: #1a202c; /* Gris oscuro para el texto principal */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; /* Asegura que el cuerpo ocupe al menos toda la altura de la ventana */
+        }
+        /* Contenedor principal para centrar el contenido */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex-grow: 1; /* Permite que el contenedor crezca y ocupe el espacio disponible */
+        }
+        /* Contenedor del chat para la simulación */
+        .chat-container {
+            background-color: #ffffff; /* Fondo blanco para el chat */
+            border-radius: 0.75rem; /* Bordes redondeados (rounded-xl de Tailwind) */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); /* Sombra más pronunciada */
+            padding: 1.5rem;
+            margin-top: 2rem;
+            min-height: 450px; /* Altura mínima del contenedor del chat aumentada */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Espacia el historial del chat y el área de entrada */
+        }
+        /* Área del historial del chat con scroll */
+        .chat-history {
+            flex-grow: 1; /* Permite que el historial crezca y ocupe la mayor parte del espacio */
+            overflow-y: auto; /* Habilita el scroll vertical si el contenido excede la altura */
+            max-height: 550px; /* Altura máxima para el scroll aumentada */
+            padding-right: 1rem; /* Espacio para la barra de scroll */
+        }
+        /* Estilos para cada mensaje individual en el chat */
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem; /* Bordes más redondeados para los mensajes */
+            max-width: 85%; /* Ancho máximo para los mensajes */
+            line-height: 1.5; /* Espaciado de línea mejorado */
+        }
+        /* Estilos para mensajes del experto (AI) */
+        .message.ai {
+            background-color: #e0e7ff; /* Azul claro (indigo-100 de Tailwind) */
+            align-self: flex-start; /* Alinea a la izquierda */
+            margin-right: auto; /* Empuja a la izquierda */
+            color: #374151; /* Color de texto para contraste */
+        }
+        /* Estilos para mensajes del usuario (estudiante) */
+        .message.user {
+            background-color: #dcfce7; /* Verde claro (emerald-100 de Tailwind) */
+            align-self: flex-end; /* Alinea a la derecha */
+            margin-left: auto; /* Empuja a la derecha */
+            text-align: right; /* Alinea el texto a la derecha */
+            color: #374151; /* Color de texto para contraste */
+        }
+        /* Área de entrada de texto y botón de enviar */
+        .input-area {
+            display: flex;
+            flex-direction: column; /* Cambiado a columna para el textarea más grande */
+            margin-top: 1rem;
+            gap: 0.75rem; /* Espacio entre el input y el botón */
+        }
+        /* Estilos para el spinner de carga */
+        .loading-spinner {
+            border: 4px solid #e2e8f0; /* Color claro del borde */
+            border-top: 4px solid #4f46e5; /* Azul oscuro (indigo-600 de Tailwind) para la parte superior */
+            border-radius: 50%; /* Forma circular */
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite; /* Animación de giro */
+            margin: 20px auto; /* Centra el spinner */
+        }
+        /* Definición de la animación de giro */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Encabezado de la página -->
+    <header class="bg-indigo-700 text-white p-4 shadow-lg">
+        <div class="container flex justify-between items-center">
+            <h1 class="text-3xl font-bold">Simulación de Casos Clínicos de Micología</h1>
+        </div>
+    </header>
+
+    <!-- Contenido principal de la simulación -->
+    <main class="container py-8">
+        <section>
+            <h2 class="text-2xl font-semibold mb-4 text-center text-indigo-800">Simulación Interactiva de Micosis Subcutáneas</h2>
+            <!-- Muestra el ID de usuario para referencia -->
+            <div id="user-id-display" class="text-sm text-gray-500 text-center mb-4"></div>
+            <div id="simulation-area" class="chat-container">
+                <!-- Historial de la conversación -->
+                <div id="chat-history" class="chat-history">
+                    <!-- Mensaje inicial del experto -->
+                    <div class="message ai">
+                        <p>¡Hola, futuro profesional de enfermería! Soy tu experto en micología para esta simulación. Estoy aquí para ayudarte a fortalecer tus conocimientos sobre micosis subcutáneas. Cuando estés listo para empezar, haz clic en "Iniciar Simulación".</p>
+                        <p>Recuerda: No actuaré tu rol y siempre esperaré tu respuesta.</p>
+                    </div>
+                </div>
+                <!-- Controles de entrada (botón de inicio, campo de texto, botón de enviar) -->
+                <div id="input-controls" class="input-area">
+                    <button id="start-simulation-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full">Iniciar Simulación</button>
+                    <textarea id="user-input" rows="3" class="flex-grow p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 hidden resize-y bg-blue-50 text-left" placeholder="Escribe tu respuesta aquí..."></textarea>
+                    <button id="send-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-300 ease-in-out transform hover:scale-105 hidden">Enviar</button>
+                </div>
+                <!-- Indicador de carga (spinner) -->
+                <div id="loading-indicator" class="hidden text-center mt-4">
+                    <div class="loading-spinner"></div>
+                    <p class="text-gray-600">Pensando...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Pie de página -->
+    <footer class="bg-gray-800 text-white p-4 mt-auto text-center">
+        <p>&copy; 2025 Curso de Micología. Todos los derechos reservados.</p>
+    </footer>
+
+    <script type="module">
+        // Importaciones de Firebase SDK (versión 11.6.1)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variables globales de Firebase proporcionadas por el entorno Canvas
+        // Estas variables son inyectadas por el entorno de Canvas o un sistema similar
+        // y son adecuadas para despliegues estáticos como GitHub Pages donde no se
+        // manejan claves de API directamente en el código del cliente por seguridad.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app; // Instancia de la aplicación Firebase
+        let db;  // Instancia de Firestore
+        let auth; // Instancia de Autenticación de Firebase
+        let userId = null; // ID del usuario actual
+        let simulationDocRef = null; // Referencia al documento de la simulación actual en Firestore
+
+        // Elementos del DOM
+        const chatHistoryDiv = document.getElementById('chat-history');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const startSimulationBtn = document.getElementById('start-simulation-btn');
+        const inputControls = document.getElementById('input-controls');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        // Estado de la simulación
+        let simulationState = {
+            status: 'initial', // Puede ser 'initial', 'diagnosing', 'dilemma_phase', 'evaluation', 'finished'
+            interactionCount: 0, // Contador de interacciones en la fase de dilemas
+            chatHistory: [], // Historial completo de la conversación
+            initialDiagnosis: {}, // Para almacenar áreas de conocimiento identificadas
+            evaluationQuestions: [], // Preguntas de evaluación generadas
+            feedback: '', // Feedback final del experto
+            currentQuestionIndex: 0, // Índice de la pregunta diagnóstica actual
+            waitingForChoice: false, // Nuevo flag para saber si estamos esperando la elección del usuario (continuar/feedback)
+            diagnosticQuestions: [ // Preguntas diagnósticas iniciales
+                "Como estudiante de enfermería, ¿cuáles consideras que son los factores epidemiológicos clave que predisponen a las personas a desarrollar micosis subcutáneas en regiones tropicales?",
+                "Desde una perspectiva microbiológica, ¿qué características generales de los hongos causantes de micosis subcutáneas son importantes para su identificación y patogenia?",
+                "En cuanto al diagnóstico, ¿qué métodos iniciales de laboratorio o clínicos sugerirías para abordar una posible micosis subcutánea, antes de llegar a pruebas más específicas?",
+                "Finalmente, desde la fisiopatología, ¿cómo crees que los hongos subcutáneos logran establecer una infección y qué mecanismos de defensa del huésped se ven comprometidos?"
+            ]
+        };
+
+        // --- Inicialización y Autenticación de Firebase ---
+        async function initializeFirebase() {
+            // No se realiza una verificación de los marcadores de posición aquí,
+            // ya que se asume que las variables globales __firebase_config, etc.,
+            // serán proporcionadas por el entorno de despliegue (como Canvas).
+            // Si despliegas esto directamente en un servidor web sin un entorno
+            // que inyecte estas variables, necesitarás insertar tu firebaseConfig real.
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Observador del estado de autenticación
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid; // Establece el ID de usuario
+                        userIdDisplay.textContent = `ID de Usuario: ${userId}`; // Muestra el ID de usuario
+                        console.log("Firebase Authenticated. User ID:", userId);
+                        await loadOrCreateSimulation(); // Carga o crea la simulación para este usuario
+                    } else {
+                        // Si no hay usuario autenticado, intenta iniciar sesión anónimamente
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                displayMessage("Error al inicializar la aplicación. Por favor, recarga la página.", true);
+            }
+        }
+
+        // --- Gestión de la Simulación con Firestore ---
+        async function loadOrCreateSimulation() {
+            if (!userId) {
+                console.error("User ID is not available for loading simulation.");
+                return;
+            }
+
+            // Referencia a la colección de simulaciones del usuario
+            const simulationsColRef = collection(db, `artifacts/${appId}/users/${userId}/simulations`);
+            // Consulta para buscar la simulación existente para este usuario (asumiendo una por usuario)
+            const q = query(simulationsColRef, where("userId", "==", userId));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                // Si existe una simulación, la carga
+                const docSnap = querySnapshot.docs[0];
+                simulationDocRef = doc(db, `artifacts/${appId}/users/${userId}/simulations`, docSnap.id);
+                simulationState = docSnap.data(); // Actualiza el estado de la simulación
+                console.log("Loaded existing simulation:", simulationState);
+                renderChatHistory(); // Renderiza el historial del chat
+                updateUIForSimulationState(); // Actualiza la UI según el estado
+            } else {
+                // Si no existe, crea una nueva simulación
+                const newDocRef = doc(simulationsColRef); // Firestore genera un ID único
+                simulationDocRef = newDocRef;
+                simulationState.userId = userId;
+                // Mensaje inicial para una nueva simulación
+                simulationState.chatHistory = [{ role: 'ai', text: "¡Hola, futuro profesional de enfermería! Soy tu experto en micología para esta simulación. Estoy aquí para ayudarte a fortalecer tus conocimientos sobre micosis subcutáneas. Cuando estés listo para empezar, haz clic en 'Iniciar Simulación'." }];
+                await setDoc(simulationDocRef, simulationState); // Guarda el estado inicial en Firestore
+                console.log("Created new simulation:", simulationState);
+                renderChatHistory(); // Renderiza el historial
+                updateUIForSimulationState(); // Actualiza la UI
+            }
+
+            // Configura un oyente en tiempo real para el documento de la simulación
+            onSnapshot(simulationDocRef, (doc) => {
+                if (doc.exists()) {
+                    simulationState = doc.data(); // Actualiza el estado local con los datos más recientes
+                    renderChatHistory(); // Vuelve a renderizar el chat
+                    updateUIForSimulationState(); // Actualiza la UI
+                } else {
+                    console.log("Simulation document does not exist, perhaps deleted.");
+                }
+            }, (error) => {
+                console.error("Error listening to simulation document:", error);
+                displayMessage("Error al cargar la simulación en tiempo real.", true);
+            });
+        }
+
+        // Función para actualizar el estado de la simulación en Firestore
+        async function updateSimulationStateInFirestore() {
+            if (simulationDocRef) {
+                await updateDoc(simulationDocRef, simulationState);
+            } else {
+                console.error("Simulation document reference not set.");
+            }
+        }
+
+        // --- Renderizado de la Interfaz de Usuario (UI) ---
+        function renderChatHistory() {
+            chatHistoryDiv.innerHTML = ''; // Limpia el historial actual
+            simulationState.chatHistory.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${msg.role}`; // Asigna clases CSS según el rol (ai/user)
+                msgDiv.innerHTML = formatText(msg.text); // Formatea y añade el texto del mensaje
+                chatHistoryDiv.appendChild(msgDiv);
+            });
+            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight; // Desplaza el chat hasta el último mensaje
+        }
+
+        // Función para añadir un mensaje al historial y actualizar Firestore
+        function displayMessage(text, isAI = true) {
+            simulationState.chatHistory.push({ role: isAI ? 'ai' : 'user', text: text });
+            updateSimulationStateInFirestore(); // Esto activará el onSnapshot y renderizará el chat
+        }
+
+        // Muestra/oculta el indicador de carga
+        function showLoading(show) {
+            loadingIndicator.classList.toggle('hidden', !show);
+            userInput.disabled = show; // Deshabilita el input mientras carga
+            sendBtn.disabled = show; // Deshabilita el botón de enviar
+            startSimulationBtn.disabled = show; // Deshabilita el botón de iniciar/reiniciar
+        }
+
+        // Actualiza el estado de los controles de UI (botones, input) según la fase de la simulación
+        function updateUIForSimulationState() {
+            if (simulationState.status === 'initial') {
+                startSimulationBtn.classList.remove('hidden');
+                userInput.classList.add('hidden');
+                sendBtn.classList.add('hidden');
+            } else {
+                startSimulationBtn.classList.add('hidden');
+                userInput.classList.remove('hidden');
+                sendBtn.classList.remove('hidden');
+            }
+
+            if (simulationState.status === 'finished') {
+                userInput.classList.add('hidden');
+                sendBtn.classList.add('hidden');
+                startSimulationBtn.classList.remove('hidden'); // Permite reiniciar la simulación
+                startSimulationBtn.textContent = 'Reiniciar Simulación'; // Cambia el texto del botón
+            } else {
+                startSimulationBtn.textContent = 'Iniciar Simulación'; // Asegura el texto correcto si no ha terminado
+            }
+        }
+
+        // --- Interacción con el Modelo de Lenguaje (LLM) ---
+        async function callLLM(promptText) {
+            showLoading(true); // Muestra el spinner de carga
+            try {
+                // Prepara el historial del chat para el LLM, mapeando 'ai' a 'model'
+                let chatHistoryForLLM = simulationState.chatHistory.map(msg => ({
+                    role: msg.role === 'ai' ? 'model' : 'user',
+                    parts: [{ text: msg.text }]
+                }));
+
+                // Añade el prompt actual del experto al historial para la llamada al LLM
+                chatHistoryForLLM.push({ role: "user", parts: [{ text: promptText }] });
+
+                const payload = { contents: chatHistoryForLLM };
+                const apiKey = ""; // La clave API será proporcionada por Canvas en tiempo de ejecución
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Error de API: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text; // Devuelve el texto generado
+                } else {
+                    throw new Error('El modelo no generó contenido.');
+                }
+            } catch (error) {
+                console.error('Error al llamar al LLM:', error);
+                displayMessage(`Error en la comunicación con el experto: ${error.message}. Intenta de nuevo.`, true);
+                return null;
+            } finally {
+                showLoading(false); // Oculta el spinner de carga
+            }
+        }
+
+        // --- Lógica de la Simulación ---
+        async function startSimulation() {
+            // Reinicia el estado de la simulación
+            simulationState = {
+                status: 'diagnosing',
+                interactionCount: 0,
+                chatHistory: [], // Limpia el historial para una nueva simulación
+                initialDiagnosis: {},
+                evaluationQuestions: [],
+                feedback: '',
+                currentQuestionIndex: 0,
+                waitingForChoice: false, // Reinicia el flag
+                diagnosticQuestions: [ // Preguntas diagnósticas iniciales
+                    "Como estudiante de enfermería, ¿cuáles consideras que son los factores epidemiológicos clave que predisponen a las personas a desarrollar micosis subcutáneas en regiones tropicales?",
+                    "Desde una perspectiva microbiológica, ¿qué características generales de los hongos causantes de micosis subcutáneas son importantes para su identificación y patogenia?",
+                    "En cuanto al diagnóstico, ¿qué métodos iniciales de laboratorio o clínicos sugerirías para abordar una posible micosis subcutánea, antes de llegar a pruebas más específicas?",
+                    "Finalmente, desde la fisiopatología, ¿cómo crees que los hongos subcutáneos logran establecer una infección y qué mecanismos de defensa del huésped se ven comprometidos?"
+                ]
+            };
+            // Inicia la simulación con la primera pregunta diagnóstica
+            simulationState.chatHistory.push({ role: 'ai', text: "¡Excelente! Comencemos con unas preguntas de diagnóstico iniciales para explorar tus conocimientos. Esto nos ayudará a adaptar el caso. \n\n<strong>Pregunta 1: " + simulationState.diagnosticQuestions[0] + "</strong>" });
+            simulationState.currentQuestionIndex = 0;
+            await updateSimulationStateInFirestore(); // Guarda el estado inicial en Firestore
+        }
+
+        // Maneja la respuesta del usuario y avanza la simulación
+        async function handleUserResponse() {
+            const userText = userInput.value.trim();
+            if (!userText) return; // No procesa respuestas vacías
+
+            displayMessage(userText, false); // Muestra el mensaje del usuario
+            userInput.value = ''; // Limpia el campo de entrada
+
+            let llmPrompt = "";
+
+            if (simulationState.status === 'diagnosing') {
+                if (simulationState.waitingForChoice) {
+                    // El usuario está respondiendo a la pregunta de "continuar o feedback"
+                    const userChoice = userText.toLowerCase();
+                    if (userChoice.includes('sí') || userChoice.includes('si') || userChoice.includes('continuar') || userChoice.includes('siguiente')) {
+                        simulationState.currentQuestionIndex++;
+                        simulationState.waitingForChoice = false; // Resetear el flag
+
+                        if (simulationState.currentQuestionIndex < simulationState.diagnosticQuestions.length) {
+                            // Presentar la siguiente pregunta diagnóstica
+                            displayMessage(`¡Excelente! Aquí tienes la siguiente. \n\n<strong>Pregunta ${simulationState.currentQuestionIndex + 1}: ${simulationState.diagnosticQuestions[simulationState.currentQuestionIndex]}</strong>`, true);
+                        } else {
+                            // Todas las preguntas diagnósticas respondidas, transicionar a la fase de dilemas
+                            simulationState.status = 'dilemma_phase';
+                            llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería. Estamos en una simulación para practicar mi conocimiento sobre micosis subcutáneas. El objetivo es integrar conocimientos clave de microbiología, fisiopatología, epidemiología e inmunología relacionados con las micosis humanas, específicamente las micosis subcutáneas.
+                            Crea un escenario de caso clínico de micosis subcutánea limitado a una región tropical. Presenta un dilema o problema específico que yo, como estudiante de enfermería, deba enfrentar y que me oriente a tomar una decisión consecuente.
+                            Recuerda: Permite abordar la identificación de estructuras microscópicas micóticas y la ubicación y tipo de lesiones. Asume el rol de la utilidad para la profesión de la enfermería.
+                            No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta. Evita usar la palabra 'desafío' en tus respuestas.
+                            Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.`;
+                            const caseScenario = await callLLM(llmPrompt);
+                            if (caseScenario) {
+                                displayMessage(`¡Excelente! Ahora que hemos explorado tus conocimientos iniciales, es hora de aplicar lo aprendido en un caso real.`, true);
+                                displayMessage(caseScenario, true);
+                            }
+                        }
+                    } else if (userChoice.includes('retroalimentación pregunta') || userChoice.includes('pregunta anterior')) {
+                        // Solicitar más retroalimentación sobre la pregunta en sí
+                        const previousQuestion = simulationState.diagnosticQuestions[simulationState.currentQuestionIndex]; // Sigue en la misma pregunta
+                        llmPrompt = `Eres un experto en microbiología especializado en micología. Yo soy un estudiante de enfermería de cuarto semestre. Acabo de responder a la <strong>Pregunta ${simulationState.currentQuestionIndex + 1}: "${previousQuestion}"</strong>. Mi respuesta fue: "${simulationState.chatHistory[simulationState.chatHistory.length - 2].text}".
+                        Necesito más retroalimentación sobre la pregunta en sí. ¿Podrías explicar o contextualizar más la <strong>Pregunta ${simulationState.currentQuestionIndex + 1}: "${previousQuestion}"</strong>?
+                        **Asegúrate de que cualquier subtítulo de retroalimentación, como "Retroalimentación:", "Profundización de la pregunta:", o "Aspectos clave:", esté en negrita.** No actúes mi rol. No te adelantes. Después de tu explicación, por favor, vuelve a preguntarme de forma empática si deseo continuar o si necesito más retroalimentación sobre mi respuesta o la pregunta. Evita usar la palabra 'desafío' en tus respuestas.
+                        La retroalimentación debe ser precisa y exigente, en modo académico. Las preguntas deben ser específicas y no dar a equívocos.`;
+                        const llmResponse = await callLLM(llmPrompt);
+                        if (llmResponse) {
+                            displayMessage(llmResponse, true);
+                            // Mantener waitingForChoice en true para que el usuario pueda seguir eligiendo
+                        }
+                    } else if (userChoice.includes('retroalimentación respuesta') || userChoice.includes('mi respuesta')) {
+                        // Solicitar más retroalimentación sobre la respuesta del usuario
+                        const previousQuestion = simulationState.diagnosticQuestions[simulationState.currentQuestionIndex]; // Sigue en la misma pregunta
+                        const previousAnswer = simulationState.chatHistory[simulationState.chatHistory.length - 2].text; // Último mensaje del usuario
+                        llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería de cuarto semestre. Acabo de responder a la <strong>Pregunta ${simulationState.currentQuestionIndex + 1}: "${previousQuestion}"</strong>. Mi respuesta fue: "${previousAnswer}".
+                        Necesito más retroalimentación sobre mi respuesta. ¿Podrías analizar mi respuesta con más detalle, señalando específicamente qué aspectos fueron precisos y cuáles podrían ser mejorados o complementados?
+                        **Asegúrate de que cualquier subtítulo de retroalimentación, como "Retroalimentación:", "Análisis de tu respuesta:", o "Puntos a considerar:", esté en negrita.** No actúes mi rol. No te adelantes. Después de tu análisis, por favor, vuelve a preguntarme de forma empática si deseo continuar o si necesito más retroalimentación sobre mi respuesta o la pregunta. Evita usar la palabra 'desafío' en tus respuestas.
+                        La retroalimentación debe ser precisa y exigente, en modo académico. Las preguntas deben ser específicas y no dar a equívocos.`;
+                        const llmResponse = await callLLM(llmPrompt);
+                        if (llmResponse) {
+                            displayMessage(llmResponse, true);
+                            // Mantener waitingForChoice en true para que el usuario pueda seguir eligiendo
+                        }
+                    } else {
+                        // Opción inválida, pedir al usuario que elija de nuevo
+                        displayMessage("No te he entendido. Por favor, responde 'sí' o 'continuar' para avanzar, o 'retroalimentación pregunta' para más detalles sobre la pregunta, o 'retroalimentación respuesta' para más detalles sobre tu respuesta anterior.", true);
+                    }
+                } else {
+                    // El usuario está respondiendo a una pregunta diagnóstica
+                    const currentQuestion = simulationState.diagnosticQuestions[simulationState.currentQuestionIndex];
+                    llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería de cuarto semestre. Estamos en una simulación para practicar mi conocimiento sobre micosis subcutáneas. El objetivo es integrar conocimientos clave de microbiología, fisiopatología, epidemiología e inmunología relacionados con las micosis humanas, específicamente las micosis subcutáneas.
+                    Acabo de responder a la <strong>Pregunta ${simulationState.currentQuestionIndex + 1}: "${currentQuestion}"</strong>. Mi respuesta fue: "${userText}".
+                    Por favor, retroalimenta mi respuesta. Identifica las áreas donde demuestras un conocimiento sólido y las oportunidades de mejora en relación con la pregunta. **Asegúrate de que cualquier subtítulo de retroalimentación, como "Retroalimentación:", "Áreas de conocimiento sólido:", o "Oportunidades de mejora:", esté en negrita.** No actúes mi rol. No te adelantes. Evita usar la palabra 'desafío' en tus respuestas.
+                    Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.
+                    
+                    Una vez que hayas revisado mi retroalimentación, ¿estás listo/a para la siguiente pregunta, o te gustaría que profundicemos en algún aspecto de la pregunta anterior o de tu respuesta? Puedes responder 'sí' o 'continuar' para avanzar, 'retroalimentación pregunta' para más detalles sobre la pregunta, o 'retroalimentación respuesta' para más detalles sobre tu respuesta.`;
+
+                    const llmResponse = await callLLM(llmPrompt);
+                    if (llmResponse) {
+                        displayMessage(llmResponse, true);
+                        simulationState.waitingForChoice = true; // Establecer el flag para esperar la elección del usuario
+                    }
+                }
+            } else if (simulationState.status === 'dilemma_phase') {
+                // Fase de dilemas del caso clínico
+                simulationState.interactionCount++; // Incrementa el contador de interacciones en esta fase
+                llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería. Estamos en un escenario de caso clínico de micosis subcutánea. Mi última respuesta fue: "${userText}".
+                Por favor, evalúa mi respuesta en el contexto del caso. Presenta el siguiente dilema o problema específico que yo, como estudiante de enfermería, deba enfrentar y que me oriente a tomar una decisión consecuente.
+                Hemos tenido ${simulationState.interactionCount} interacciones en la fase de dilemas (después de las preguntas diagnósticas).
+                Recuerda: El caso debe estar limitado a regiones tropicales. Permite abordar la identificación de estructuras microscópicas micóticas y la ubicación y tipo de lesiones. Asume el rol de la utilidad para la profesión de la enfermería.
+                No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta. Evita usar la palabra 'desafío' en tus respuestas.
+                Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.`;
+
+                const llmResponse = await callLLM(llmPrompt);
+                if (llmResponse) {
+                    displayMessage(llmResponse, true);
+
+                    // Después de 5 interacciones en la fase de dilemas, transiciona a la evaluación
+                    if (simulationState.interactionCount >= 5) {
+                        simulationState.status = 'evaluation';
+                        llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería. Hemos llegado al final de las interacciones del caso clínico. Mi última respuesta fue: "${userText}".
+                        Ahora, por favor, establece una elección consecuente que yo deba tomar basada en el escenario y nuestras interacciones.
+                        Después de que yo te dé mi decisión, me pedirás que te la diga. Una vez que la haya dicho, generarás cinco preguntas tipo test de cinco opciones de respuesta y de completar para evaluar mi proceso de aprendizaje. Finalmente, termina diciéndome cómo me desempeñé en la simulación, haciendo un feedback de las cosas buenas y qué puedo hacer mejor la próxima vez. **Asegúrate de que cualquier subtítulo en el feedback, como "Feedback general:", "Áreas de buen desempeño:", o "Oportunidades de mejora:", esté en negrita.** Evita usar la palabra 'desafío' en tus respuestas.
+                        Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.
+                        No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta.`;
+                        const finalDecisionPrompt = await callLLM(llmPrompt);
+                        if (finalDecisionPrompt) {
+                            displayMessage(finalDecisionPrompt, true);
+                        }
+                    }
+                }
+            } else if (simulationState.status === 'evaluation') {
+                // Fase de evaluación y feedback final
+                llmPrompt = `Eres un experto en micología. Yo soy un estudiante de enfermería. Acabo de tomar mi decisión final en el caso: "${userText}".
+                Ahora, por favor, procede a generar cinco preguntas tipo test de cinco opciones de respuesta y de completar para evaluar mi proceso de aprendizaje. Después de las preguntas, dame un feedback detallado sobre cómo me desempeñé en la simulación, destacando las áreas donde demostraste un buen desempeño y las oportunidades de mejora para la próxima vez. **Asegúrate de que cualquier subtítulo en el feedback, como "Feedback general:", "Áreas de buen desempeño:", o "Oportunidades de mejora:", esté en negrita.** Evita usar la palabra 'desafío' en tus respuestas.
+                Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.
+                No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta.`;
+                const finalEvaluationAndFeedback = await callLLM(llmPrompt);
+                if (finalEvaluationAndFeedback) {
+                    displayMessage(finalEvaluationAndFeedback, true);
+                    simulationState.status = 'finished'; // Marca la simulación como finalizada
+                }
+            }
+            await updateSimulationStateInFirestore(); // Guarda el estado actualizado en Firestore
+        }
+
+        // Función simple para formatear el texto, convirtiendo saltos de línea en párrafos
+        function formatText(text) {
+            // Reemplaza dobles saltos de línea con etiquetas de párrafo y saltos de línea simples con <br>
+            return text.split('\n\n').map(paragraph => `<p class="mb-2">${paragraph.replace(/\n/g, '<br>')}</p>`).join('');
+        }
+
+        // --- Event Listeners ---
+        startSimulationBtn.addEventListener('click', startSimulation); // Inicia la simulación al hacer clic
+        sendBtn.addEventListener('click', handleUserResponse); // Envía la respuesta del usuario al hacer clic
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Previene el salto de línea por defecto en textarea al presionar Enter
+                handleUserResponse(); // Envía la respuesta del usuario al presionar Enter
+            }
+        });
+
+        // Inicializa Firebase cuando el DOM esté completamente cargado
+        document.addEventListener('DOMContentLoaded', initializeFirebase);
+    </script>
+</body>
+</html>
