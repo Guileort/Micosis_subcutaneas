@@ -65,6 +65,13 @@
             text-align: right; /* Alinea el texto a la derecha */
             color: #374151; /* Color de texto para contraste */
         }
+        /* Estilo para mensajes de error prominentes */
+        .message.error {
+            background-color: #fee2e2; /* Rojo claro (red-100 de Tailwind) */
+            color: #991b1b; /* Rojo oscuro (red-800 de Tailwind) */
+            font-weight: bold;
+            text-align: center;
+        }
         /* Área de entrada de texto y botón de enviar */
         .input-area {
             display: flex;
@@ -87,13 +94,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Estilo para mensajes de error prominentes */
-        .message.error {
-            background-color: #fee2e2; /* Rojo claro (red-100 de Tailwind) */
-            color: #991b1b; /* Rojo oscuro (red-800 de Tailwind) */
-            font-weight: bold;
-            text-align: center;
-        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -113,11 +113,7 @@
             <div id="simulation-area" class="chat-container">
                 <!-- Historial de la conversación -->
                 <div id="chat-history" class="chat-history">
-                    <!-- Mensaje inicial del experto -->
-                    <div class="message ai">
-                        <p>¡Hola, futuro profesional de enfermería! Soy tu experto en micología para esta simulación. Estoy aquí para ayudarte a fortalecer tus conocimientos sobre micosis subcutáneas. Cuando estés listo para empezar, haz clic en "Iniciar Simulación".</p>
-                        <p>Recuerda: No actuaré tu rol y siempre esperaré tu respuesta.</p>
-                    </div>
+                    <!-- El mensaje inicial del experto ahora se carga dinámicamente -->
                 </div>
                 <!-- Controles de entrada (botón de inicio, campo de texto, botón de enviar) -->
                 <div id="input-controls" class="input-area">
@@ -161,7 +157,7 @@
         //
         //    ¡¡¡REEMPLAZA CADA VALOR "TU_..." CON EL VALOR REAL DE TU PROYECTO!!!
         const firebaseConfig = {
-            apiKey: "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ", // <--- ¡COMMA REMOVED HERE! (COMA ELIMINADA AQUÍ)
+            apiKey: "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ", // <--- Tu clave API de Firebase (actualizada)
             authDomain: "simulacion-micosis-subcutaneas.firebaseapp.com",
             projectId: "simulacion-micosis-subcutaneas",
             storageBucket: "simulacion-micosis-subcutaneas.firebasestorage.app",
@@ -181,7 +177,7 @@
         //    puedes insertarla aquí.
         //
         //    ¡¡¡REEMPLAZA "TU_CLAVE_API_DE_GEMINI" CON TU CLAVE REAL!!!
-        const GEMINI_API_KEY = "TU_CLAVE_API_DE_GEMINI"; // <--- ¡REEMPLAZA ESTO! Ejemplo: "AIzaSyD_XyZ789..."
+        const GEMINI_API_KEY = "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ"; // <--- ¡Clave API de Gemini actualizada!
         // ====================================================================================================
 
         // Usamos el projectId como appId para la estructura de Firestore
@@ -220,123 +216,51 @@
             ]
         };
 
-        // --- Inicialización y Autenticación de Firebase ---
-        async function initializeFirebase() {
-            // Verificar si la configuración de Firebase es la predeterminada (no real)
-            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI") {
-                const errorMessage = "¡ERROR CRÍTICO DE CONFIGURACIÓN! Por favor, reemplaza los valores de 'firebaseConfig' y 'GEMINI_API_KEY' en el código con tus credenciales reales. Consulta los comentarios en el código para más detalles.";
-                console.error(errorMessage);
-                displayMessage(errorMessage, true, true); // Añadir un tercer parámetro para indicar que es un error crítico
-                showLoading(false);
-                // Deshabilitar el botón de inicio para evitar intentos fallidos
-                startSimulationBtn.disabled = true;
-                startSimulationBtn.textContent = "Error de Configuración";
-                return; // Detener la inicialización si la configuración es incorrecta
-            }
+        // --- Funciones de utilidad para el chat y la UI ---
 
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // Observador del estado de autenticación
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid; // Establece el ID de usuario
-                        userIdDisplay.textContent = `ID de Usuario: ${userId}`; // Muestra el ID de usuario
-                        console.log("Firebase Authenticated. User ID:", userId);
-                        await loadOrCreateSimulation(); // Carga o crea la simulación para este usuario
-                    } else {
-                        // En GitHub Pages, si no hay token personalizado, siempre intentamos autenticación anónima.
-                        await signInAnonymously(auth);
-                    }
-                });
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                displayMessage(`Error al inicializar la aplicación: ${error.message}. Por favor, verifica tu configuración de Firebase y recarga la página.`, true, true);
-                showLoading(false);
-                startSimulationBtn.disabled = true;
-                startSimulationBtn.textContent = "Error de Inicialización";
-            }
+        // Función para formatear el texto, convirtiendo saltos de línea en párrafos
+        function formatText(text) {
+            // Reemplaza dobles saltos de línea con etiquetas de párrafo y saltos de línea simples con <br>
+            return text.split('\n\n').map(paragraph => `<p class="mb-2">${paragraph.replace(/\n/g, '<br>')}</p>`).join('');
         }
 
-        // --- Gestión de la Simulación con Firestore ---
-        async function loadOrCreateSimulation() {
-            if (!userId) {
-                console.error("User ID is not available for loading simulation.");
-                // Si userId no está disponible, es probable que la inicialización de Firebase fallara.
-                // displayMessage ya debería haber manejado el error.
-                return;
-            }
-
-            // Referencia a la colección de simulaciones del usuario
-            const simulationsColRef = collection(db, `artifacts/${appId}/users/${userId}/simulations`);
-            // Consulta para buscar la simulación existente para este usuario (asumiendo una por usuario)
-            const q = query(simulationsColRef, where("userId", "==", userId));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                // Si existe una simulación, la carga
-                const docSnap = querySnapshot.docs[0];
-                simulationDocRef = doc(db, `artifacts/${appId}/users/${userId}/simulations`, docSnap.id);
-                simulationState = docSnap.data(); // Actualiza el estado de la simulación
-                console.log("Loaded existing simulation:", simulationState);
-                renderChatHistory(); // Renderiza el historial del chat
-                updateUIForSimulationState(); // Actualiza la UI según el estado
-            } else {
-                // Si no existe, crea una nueva simulación
-                const newDocRef = doc(simulationsColRef); // Firestore genera un ID único
-                simulationDocRef = newDocRef;
-                simulationState.userId = userId;
-                // Mensaje inicial para una nueva simulación
-                simulationState.chatHistory = [{ role: 'ai', text: "¡Hola, futuro profesional de enfermería! Soy tu experto en micología para esta simulación. Estoy aquí para ayudarte a fortalecer tus conocimientos sobre micosis subcutáneas. Cuando estés listo para empezar, haz clic en 'Iniciar Simulación'." }];
-                await setDoc(simulationDocRef, simulationState); // Guarda el estado inicial en Firestore
-                console.log("Created new simulation:", simulationState);
-                renderChatHistory(); // Renderiza el historial
-                updateUIForSimulationState(); // Actualiza la UI
-            }
-
-            // Configura un oyente en tiempo real para el documento de la simulación
-            onSnapshot(simulationDocRef, (doc) => {
-                if (doc.exists()) {
-                    simulationState = doc.data(); // Actualiza el estado local con los datos más recientes
-                    renderChatHistory(); // Vuelve a renderizar el chat
-                    updateUIForSimulationState(); // Actualiza la UI
-                } else {
-                    console.log("Simulation document does not exist, perhaps deleted.");
-                }
-            }, (error) => {
-                console.error("Error listening to simulation document:", error);
-                displayMessage("Error al cargar la simulación en tiempo real.", true, true);
+        // Función para renderizar todo el historial del chat desde simulationState
+        function renderChatHistory() {
+            chatHistoryDiv.innerHTML = ''; // Limpia los mensajes existentes
+            simulationState.chatHistory.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${msg.role === 'ai' ? 'ai' : 'user'} ${msg.isError ? 'error' : ''}`;
+                msgDiv.innerHTML = formatText(msg.text);
+                chatHistoryDiv.appendChild(msgDiv);
             });
-        }
-
-        // Función para actualizar el estado de la simulación en Firestore
-        async function updateSimulationStateInFirestore() {
-            if (simulationDocRef) {
-                await updateDoc(simulationDocRef, simulationState);
-            } else {
-                console.error("Simulation document reference not set. Cannot save state.");
-                displayMessage("Error: No se pudo guardar el estado de la simulación. La referencia al documento no está establecida.", true, true);
-            }
-        }
-
-        // --- Renderizado de la Interfaz de Usuario (UI) ---
-        // isError = true para mensajes de error, para aplicar estilos específicos
-        function displayMessage(text, isAI = true, isError = false) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${isAI ? 'ai' : 'user'} ${isError ? 'error' : ''}`;
-            msgDiv.innerHTML = formatText(text);
-            chatHistoryDiv.appendChild(msgDiv);
             chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight; // Desplaza el chat hasta el último mensaje
-
-            // Si es un error, no lo guardamos en el historial persistente del chat
-            if (!isError) {
-                simulationState.chatHistory.push({ role: isAI ? 'ai' : 'user', text: text });
-                updateSimulationStateInFirestore(); // Esto activará el onSnapshot y renderizará el chat
-            }
         }
 
+        // Función para agregar un mensaje al historial del chat y guardarlo en Firestore
+        async function addMessageToChat(text, isAI = true, isError = false) {
+            // Agrega el mensaje al estado local
+            simulationState.chatHistory.push({ role: isAI ? 'ai' : 'user', text: text, isError: isError });
+
+            // Guarda el estado actualizado en Firestore si la referencia al documento está disponible
+            if (simulationDocRef) {
+                try {
+                    await updateDoc(simulationDocRef, { chatHistory: simulationState.chatHistory });
+                } catch (error) {
+                    console.error("Error al guardar el mensaje en Firestore:", error);
+                    // Si hay un error al guardar, mostramos un mensaje de error en la UI, pero no lo persistimos
+                    const errorMsgDiv = document.createElement('div');
+                    errorMsgDiv.className = `message ai error`;
+                    errorMsgDiv.innerHTML = formatText(`Error al guardar el mensaje: ${error.message}.`);
+                    chatHistoryDiv.appendChild(errorMsgDiv);
+                    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+                }
+            } else {
+                // Si simulationDocRef no está configurado (ej. durante la carga inicial),
+                // simplemente renderizamos localmente para una respuesta inmediata.
+                // El estado inicial se guardará una vez que Firestore esté listo.
+                renderChatHistory();
+            }
+        }
 
         // Muestra/oculta el indicador de carga
         function showLoading(show) {
@@ -377,13 +301,126 @@
             }
         }
 
+        // --- Inicialización y Autenticación de Firebase ---
+        async function initializeFirebase() {
+            // Verificar si la configuración de Firebase es la predeterminada (no real)
+            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI") {
+                const errorMessage = "¡ERROR CRÍTICO DE CONFIGURACIÓN! Por favor, reemplaza los valores de 'firebaseConfig' y 'GEMINI_API_KEY' en el código con tus credenciales reales. Consulta los comentarios en el código para más detalles.";
+                console.error(errorMessage);
+                // Usar addMessageToChat para mostrar el error, marcándolo como error para que no se persista
+                addMessageToChat(errorMessage, true, true);
+                showLoading(false);
+                // Deshabilitar el botón de inicio para evitar intentos fallidos
+                startSimulationBtn.disabled = true;
+                startSimulationBtn.textContent = "Error de Configuración";
+                return; // Detener la inicialización si la configuración es incorrecta
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Observador del estado de autenticación
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid; // Establece el ID de usuario
+                        userIdDisplay.textContent = `ID de Usuario: ${userId}`; // Muestra el ID de usuario
+                        console.log("Firebase Authenticated. User ID:", userId);
+                        await loadOrCreateSimulation(); // Carga o crea la simulación para este usuario
+                    } else {
+                        // En GitHub Pages, si no hay token personalizado, siempre intentamos autenticación anónima.
+                        await signInAnonymously(auth);
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                addMessageToChat(`Error al inicializar la aplicación: ${error.message}. Por favor, verifica tu configuración de Firebase y recarga la página.`, true, true);
+                showLoading(false);
+                startSimulationBtn.disabled = true;
+                startSimulationBtn.textContent = "Error de Inicialización";
+            }
+        }
+
+        // --- Gestión de la Simulación con Firestore ---
+        async function loadOrCreateSimulation() {
+            if (!userId) {
+                console.error("User ID is not available for loading simulation.");
+                return;
+            }
+
+            // Referencia a la colección de simulaciones del usuario
+            const simulationsColRef = collection(db, `artifacts/${appId}/users/${userId}/simulations`);
+            // Consulta para buscar la simulación existente para este usuario (asumiendo una por usuario)
+            const q = query(simulationsColRef, where("userId", "==", userId));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                // Si existe una simulación, la carga
+                const docSnap = querySnapshot.docs[0];
+                simulationDocRef = doc(db, `artifacts/${appId}/users/${userId}/simulations`, docSnap.id);
+                simulationState = docSnap.data(); // Actualiza el estado de la simulación
+                console.log("Loaded existing simulation:", simulationState);
+                renderChatHistory(); // Renderiza el historial del chat
+                updateUIForSimulationState(); // Actualiza la UI según el estado
+            } else {
+                // Si no existe, crea una nueva simulación
+                const newDocRef = doc(simulationsColRef); // Firestore genera un ID único
+                simulationDocRef = newDocRef;
+                simulationState.userId = userId;
+                // Mensaje inicial para una nueva simulación
+                simulationState.chatHistory = [{ role: 'ai', text: "¡Hola, futuro profesional de enfermería! Soy tu experto en micología para esta simulación. Estoy aquí para ayudarte a fortalecer tus conocimientos sobre micosis subcutáneas. Cuando estés listo para empezar, haz clic en 'Iniciar Simulación'.\n\nRecuerda: No actuaré tu rol y siempre esperaré tu respuesta." }];
+                await setDoc(simulationDocRef, simulationState); // Guarda el estado inicial en Firestore
+                console.log("Created new simulation:", simulationState);
+                renderChatHistory(); // Renderiza el historial
+                updateUIForSimulationState(); // Actualiza la UI
+            }
+
+            // Configura un oyente en tiempo real para el documento de la simulación
+            onSnapshot(simulationDocRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    // Solo actualiza y re-renderiza si el historial del chat o el estado de la simulación realmente cambiaron
+                    if (JSON.stringify(simulationState.chatHistory) !== JSON.stringify(data.chatHistory) ||
+                        simulationState.status !== data.status ||
+                        simulationState.waitingForChoice !== data.waitingForChoice ||
+                        simulationState.currentQuestionIndex !== data.currentQuestionIndex ||
+                        simulationState.interactionCount !== data.interactionCount) {
+                        simulationState = data;
+                        renderChatHistory();
+                        updateUIForSimulationState();
+                    }
+                } else {
+                    console.log("Simulation document does not exist, perhaps deleted.");
+                }
+            }, (error) => {
+                console.error("Error listening to simulation document:", error);
+                addMessageToChat(`Error al cargar la simulación en tiempo real: ${error.message}.`, true, true);
+            });
+        }
+
+        // Función para actualizar el estado de la simulación en Firestore
+        async function updateSimulationStateInFirestore() {
+            if (simulationDocRef) {
+                try {
+                    await updateDoc(simulationDocRef, simulationState);
+                } catch (error) {
+                    console.error("Error al guardar el estado de la simulación en Firestore:", error);
+                    addMessageToChat(`Error: No se pudo guardar el estado de la simulación: ${error.message}.`, true, true);
+                }
+            } else {
+                console.error("Simulation document reference not set. Cannot save state.");
+                addMessageToChat("Error: No se pudo guardar el estado de la simulación. La referencia al documento no está establecida.", true, true);
+            }
+        }
+
         // --- Interacción con el Modelo de Lenguaje (LLM) ---
         async function callLLM(promptText) {
             // Verificar si la clave API de Gemini es la predeterminada (no real)
             if (GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI" || !GEMINI_API_KEY) {
                 const errorMessage = "ERROR DE CONFIGURACIÓN DE API DE GEMINI: Por favor, reemplaza 'TU_CLAVE_API_DE_GEMINI' en el código con tu clave API real de Gemini.";
                 console.error(errorMessage);
-                displayMessage(errorMessage, true, true);
+                addMessageToChat(errorMessage, true, true);
                 showLoading(false);
                 return null; // Detener la llamada si la clave es incorrecta
             }
@@ -425,7 +462,7 @@
                 }
             } catch (error) {
                 console.error('Error al llamar al LLM:', error);
-                displayMessage(`Error en la comunicación con el experto: ${error.message}. Intenta de nuevo.`, true, true);
+                addMessageToChat(`Error en la comunicación con el experto: ${error.message}. Intenta de nuevo.`, true, true);
                 return null;
             } finally {
                 showLoading(false); // Oculta el spinner de carga
@@ -435,9 +472,10 @@
         // --- Lógica de la Simulación ---
         async function startSimulation() {
             // Antes de iniciar, verificar nuevamente si las claves están configuradas
-            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "AIzaSyC4kbZGYiFZyJKylrtO63S5c8ZCTjZxnnQ") {
+            if (firebaseConfig.apiKey === "TU_API_KEY" || firebaseConfig.projectId === "TU_PROJECT_ID" || GEMINI_API_KEY === "TU_CLAVE_API_DE_GEMINI") {
                 const errorMessage = "¡ERROR DE CONFIGURACIÓN! No se puede iniciar la simulación. Por favor, actualiza tus claves de Firebase y Gemini en el código.";
-                displayMessage(errorMessage, true, true);
+                console.error(errorMessage);
+                addMessageToChat(errorMessage, true, true);
                 return; // Detener la simulación si las claves no están
             }
 
@@ -459,7 +497,7 @@
                 ]
             };
             // Inicia la simulación con la primera pregunta diagnóstica
-            displayMessage("¡Excelente! Comencemos con unas preguntas de diagnóstico iniciales para explorar tus conocimientos. Esto nos ayudará a adaptar el caso. \n\n<strong>Pregunta 1: " + simulationState.diagnosticQuestions[0] + "</strong>", true);
+            await addMessageToChat("¡Excelente! Comencemos con unas preguntas de diagnóstico iniciales para explorar tus conocimientos. Esto nos ayudará a adaptar el caso. \n\n<strong>Pregunta 1: " + simulationState.diagnosticQuestions[0] + "</strong>", true);
             simulationState.currentQuestionIndex = 0;
             await updateSimulationStateInFirestore(); // Guarda el estado inicial en Firestore
         }
@@ -469,7 +507,7 @@
             const userText = userInput.value.trim();
             if (!userText) return; // No procesa respuestas vacías
 
-            displayMessage(userText, false); // Muestra el mensaje del usuario
+            await addMessageToChat(userText, false); // Muestra el mensaje del usuario
             userInput.value = ''; // Limpia el campo de entrada
 
             let llmPrompt = "";
@@ -484,7 +522,7 @@
 
                         if (simulationState.currentQuestionIndex < simulationState.diagnosticQuestions.length) {
                             // Presentar la siguiente pregunta diagnóstica
-                            displayMessage(`¡Excelente! Aquí tienes la siguiente. \n\n<strong>Pregunta ${simulationState.currentQuestionIndex + 1}: ${simulationState.diagnosticQuestions[simulationState.currentQuestionIndex]}</strong>`, true);
+                            await addMessageToChat(`¡Excelente! Aquí tienes la siguiente. \n\n<strong>Pregunta ${simulationState.currentQuestionIndex + 1}: ${simulationState.diagnosticQuestions[simulationState.currentQuestionIndex]}</strong>`, true);
                         } else {
                             // Todas las preguntas diagnósticas respondidas, transicionar a la fase de dilemas
                             simulationState.status = 'dilemma_phase';
@@ -495,8 +533,8 @@
                             Las preguntas deben ser específicas y no dar a equívocos. La retroalimentación debe ser precisa y exigente, en modo académico.`;
                             const caseScenario = await callLLM(llmPrompt);
                             if (caseScenario) {
-                                displayMessage(`¡Excelente! Ahora que hemos explorado tus conocimientos iniciales, es hora de aplicar lo aprendido en un caso real.`, true);
-                                displayMessage(caseScenario, true);
+                                await addMessageToChat(`¡Excelente! Ahora que hemos explorado tus conocimientos iniciales, es hora de aplicar lo aprendido en un caso real.`, true);
+                                await addMessageToChat(caseScenario, true);
                             }
                         }
                     } else if (userChoice.includes('retroalimentación pregunta') || userChoice.includes('pregunta anterior')) {
@@ -508,7 +546,7 @@
                         La retroalimentación debe ser precisa y exigente, en modo académico. Las preguntas deben ser específicas y no dar a equívocos.`;
                         const llmResponse = await callLLM(llmPrompt);
                         if (llmResponse) {
-                            displayMessage(llmResponse, true);
+                            await addMessageToChat(llmResponse, true);
                             // Mantener waitingForChoice en true para que el usuario pueda seguir eligiendo
                         }
                     } else if (userChoice.includes('retroalimentación respuesta') || userChoice.includes('mi respuesta')) {
@@ -521,12 +559,12 @@
                         La retroalimentación debe ser precisa y exigente, en modo académico. Las preguntas deben ser específicas y no dar a equívocos.`;
                         const llmResponse = await callLLM(llmPrompt);
                         if (llmResponse) {
-                            displayMessage(llmResponse, true);
+                            await addMessageToChat(llmResponse, true);
                             // Mantener waitingForChoice en true para que el usuario pueda seguir eligiendo
                         }
                     } else {
                         // Opción inválida, pedir al usuario que elija de nuevo
-                        displayMessage("No te he entendido. Por favor, responde 'sí' o 'continuar' para avanzar, o 'retroalimentación pregunta' para más detalles sobre la pregunta, o 'retroalimentación respuesta' para más detalles sobre tu respuesta anterior.", true);
+                        await addMessageToChat("No te he entendido. Por favor, responde 'sí' o 'continuar' para avanzar, o 'retroalimentación pregunta' para más detalles sobre la pregunta, o 'retroalimentación respuesta' para más detalles sobre tu respuesta anterior.", true);
                     }
                 } else {
                     // El usuario está respondiendo a una pregunta diagnóstica
@@ -540,7 +578,7 @@
 
                     const llmResponse = await callLLM(llmPrompt);
                     if (llmResponse) {
-                        displayMessage(llmResponse, true);
+                        await addMessageToChat(llmResponse, true);
                         simulationState.waitingForChoice = true; // Establecer el flag para esperar la elección del usuario
                     }
                 }
@@ -556,7 +594,7 @@
 
                 const llmResponse = await callLLM(llmPrompt);
                 if (llmResponse) {
-                    displayMessage(llmResponse, true);
+                    await addMessageToChat(llmResponse, true);
 
                     // Después de 5 interacciones en la fase de dilemas, transiciona a la evaluación
                     if (simulationState.interactionCount >= 5) {
@@ -568,7 +606,7 @@
                         No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta.`;
                         const finalDecisionPrompt = await callLLM(llmPrompt);
                         if (finalDecisionPrompt) {
-                            displayMessage(finalDecisionPrompt, true);
+                            await addMessageToChat(finalDecisionPrompt, true);
                         }
                     }
                 }
@@ -580,17 +618,11 @@
                 No actúes mi rol. No te adelantes. Evita usar subtítulos como "Paciente", "Escenario Clínico", "Contexto" en tu respuesta.`;
                 const finalEvaluationAndFeedback = await callLLM(llmPrompt);
                 if (finalEvaluationAndFeedback) {
-                    displayMessage(finalEvaluationAndFeedback, true);
+                    await addMessageToChat(finalEvaluationAndFeedback, true);
                     simulationState.status = 'finished'; // Marca la simulación como finalizada
                 }
             }
             await updateSimulationStateInFirestore(); // Guarda el estado actualizado en Firestore
-        }
-
-        // Función simple para formatear el texto, convirtiendo saltos de línea en párrafos
-        function formatText(text) {
-            // Reemplaza dobles saltos de línea con etiquetas de párrafo y saltos de línea simples con <br>
-            return text.split('\n\n').map(paragraph => `<p class="mb-2">${paragraph.replace(/\n/g, '<br>')}</p>`).join('');
         }
 
         // --- Event Listeners ---
